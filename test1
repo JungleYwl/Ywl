@@ -1,0 +1,63 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.cluster import DBSCAN
+import cv2
+
+# 1. 构造更多有效点（模拟数据，实际请用你的真实数据替换）
+np.random.seed(42)
+valid_points = np.random.uniform(low=[40, -1, 0], high=[50, 1, 1], size=(50, 3))
+invalid_points = np.array([[-0.016016, 0.235063, 19.385]] * 30)
+points = np.vstack([valid_points, invalid_points])
+
+# 2. 数据预处理：剔除无效点
+def filter_invalid_points(points):
+    return points[points[:, 2] != 19.385]
+
+filtered_points = filter_invalid_points(points)
+
+# 3. 点云分离（DBSCAN聚类）
+def cluster_points(points, eps=1.0, min_samples=3):
+    clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
+    return clustering.labels_
+
+labels = cluster_points(filtered_points) if len(filtered_points) > 0 else []
+
+# 4. 点云投影为二维图像
+def plot_point_cloud(points, labels=None):
+    plt.figure(figsize=(6, 6))
+    if labels is not None and len(labels) == len(points):
+        plt.scatter(points[:, 0], points[:, 1], c=labels, cmap='rainbow', s=20)
+    else:
+        plt.scatter(points[:, 0], points[:, 1], s=20)
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('点云XY投影')
+    plt.show()
+
+plot_point_cloud(filtered_points, labels if len(filtered_points) > 0 else None)
+
+# 5. 保存为灰度图像（点半径更大）
+def save_as_image(points, filename='cloud.png', img_size=(256, 256), radius=3):
+    x = points[:, 0]
+    y = points[:, 1]
+    x_norm = ((x - x.min()) / (x.max() - x.min()) * (img_size[0] - 1)).astype(int)
+    y_norm = ((y - y.min()) / (y.max() - y.min()) * (img_size[1] - 1)).astype(int)
+    img = np.zeros(img_size, dtype=np.uint8)
+    for xi, yi in zip(x_norm, y_norm):
+        cv2.circle(img, (xi, yi), radius, 255, -1)
+    cv2.imwrite(filename, img)
+
+if len(filtered_points) > 0:
+    save_as_image(filtered_points)
+
+# 6. 图像边缘检测与轮廓提取
+def edge_detection(image_path):
+    img = cv2.imread(image_path, 0)
+    edges = cv2.Canny(img, 50, 150)
+    plt.figure()
+    plt.imshow(edges, cmap='gray')
+    plt.title('边缘检测')
+    plt.axis('off')
+    plt.show()
+
+edge_detection('cloud.png')
